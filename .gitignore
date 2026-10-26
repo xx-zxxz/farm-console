@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+*.log
+*.pid
+farm-config.json
+shots/
+.DS_Store
