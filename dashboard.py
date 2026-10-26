@@ -121,9 +121,9 @@ def get_focus():
 
 def get_app():
     pid = adb("shell", "pidof", PKG).strip()
-    if not pid:
+    pid = (pid.split() or [""])[0]
+    if not pid or not pid.isdigit():
         return {"running": False}
-    pid = pid.split()[0]
     q = "awk '{print $14, $15, $20, $22}' /proc/%s/stat; echo __U__; awk '{print $1}' /proc/uptime" % pid
     parts = adb("shell", q).split("__U__")
     age = thr = cpu = None
@@ -280,14 +280,26 @@ def checklist():
     ]
 
 def collect():
-    return {"static": get_static(), "versions": get_versions(), "battery": get_battery(),
-            "screen": get_screen(), "focus": get_focus(), "app": get_app(), "ram": get_ram(),
-            "storage": get_storage(), "top": get_top(), "doze": get_doze(), "saver": get_saver(),
-            "dnd": get_dnd(), "adb_state": get_adb_state(), "watchdog_pid": watchdog_alive(),
-            "watchdog_running": watchdog_alive() is not None, "relaunches": relaunch_stats(),
-            "crashes": get_crashes(), "checklist": checklist(), "cfg": CFG,
-            "uptime_s": get_uptime(), "dash_uptime_s": int(time.time() - START_TS),
-            "time": time.strftime("%H:%M:%S")}
+    collectors = {
+        "static": get_static, "versions": get_versions, "battery": get_battery,
+        "screen": get_screen, "focus": get_focus, "app": get_app, "ram": get_ram,
+        "storage": get_storage, "top": get_top, "doze": get_doze,
+        "saver": get_saver, "dnd": get_dnd, "adb_state": get_adb_state,
+        "checklist": checklist, "uptime_s": get_uptime,
+    }
+    out = {}
+    for name, fn in collectors.items():
+        try:
+            out[name] = fn()
+        except Exception as e:  # noqa: BLE001 - one bad probe must not 500 the panel
+            out[name] = {"collection_error": str(e)}
+    out.update({
+        "watchdog_pid": watchdog_alive(),
+        "watchdog_running": watchdog_alive() is not None,
+        "relaunches": relaunch_stats(), "crashes": get_crashes(), "cfg": CFG,
+        "dash_uptime_s": int(time.time() - START_TS),
+        "time": time.strftime("%H:%M:%S")})
+    return out
 
 # ---------------- actions ----------------
 def _launch():
